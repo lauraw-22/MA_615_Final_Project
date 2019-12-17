@@ -302,3 +302,60 @@ cor.test(data = frequency[frequency$city == "SF",],
 cor.test(data = frequency[frequency$city == "NYC",],
          ~ proportion + `Dallas`)
 ```
+
+## Text Mining
+- Word cloud 
+- NYC Most frequent words in high-rating restaurant reviews
+```{r}
+library(wordcloud)
+custom_stop_words <- bind_rows(tibble(word = c("food","restaurant"), 
+                                      lexicon = c("custom")), 
+                               stop_words)
+
+
+tidy_ny %>%
+    anti_join(custom_stop_words) %>%
+    count(word) %>%
+    with(wordcloud(word, n, max.words = 100))
+
+```
+
+## Text Mining
+- Word cloud 
+- SF Most frequent words in high-rating restaurant reviews
+```{r}
+library(wordcloud)
+custom_stop_words <- bind_rows(tibble(word = c("food","restaurant"), 
+                                      lexicon = c("custom")), 
+                               stop_words)
+
+
+tidy_sf %>%
+    anti_join(custom_stop_words) %>%
+    count(word) %>%
+    with(wordcloud(word, n, max.words = 100))
+
+```
+
+
+## Text Mining
+- Word cloud 
+- Dallas Most frequent words in high-rating restaurant reviews
+```{r}
+library(wordcloud)
+custom_stop_words <- bind_rows(tibble(word = c("food","restaurant"), 
+                                      lexicon = c("custom")), 
+                               stop_words)
+
+
+tidy_dl %>%
+    anti_join(custom_stop_words) %>%
+    count(word) %>%
+    with(wordcloud(word, n, max.words = 100))
+
+
+```
+
+
+
+
