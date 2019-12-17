@@ -5,7 +5,7 @@
 
 ## one row with NA latitude and longitude, remove that row
 
-ew_york <- read.csv("./data/ny.csv",stringsAsFactors = FALSE)
+new_york <- read.csv("./data/ny.csv",stringsAsFactors = FALSE)
 sf <- read.csv("./data/sf.csv",stringsAsFactors = FALSE)
 dallas <- read.csv("./data/dallas.csv",stringsAsFactors = FALSE)
 
