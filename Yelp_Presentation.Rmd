@@ -1,0 +1,304 @@
+---
+title: "MA_615_Final_Project_Yelp"
+author: "Laura"
+date: "12/16/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE,message=FALSE)
+pacman::p_load(
+yelpr,
+readxl,
+tidyverse,
+magrittr,
+gridExtra,
+scales,
+highcharter,
+leaflet,
+pander,
+maps,
+tidytext,
+stringr,
+wordcloud,
+reshape2,
+plotly
+)
+
+```
+
+## Yelp Restaurant Rating and Review Analysis
+*- Focus on Japanese restaurant in three main cities - New York, Dallas and San Fransisco.  
+*- Data from Yelp API.
+
+
+## Introduction
+
+This project aimed to explore Japanese restaurants' ratings and reviews in there most popular cities in US. Which are New York, San Fransisco and Dallas.
+
+- First we will explor the rating distributions of restaurant in different cities.
+
+- Then we will dive in their geographical location distritutions to see the clustering on a geographical scale. (Pls refer to Shiny App)
+
+- Finally we will explore on the review data to find the frequency of popular words in the reviews of    high-reviewing restaurants and also sentiments words clouds to see their positive and negative words distributions.
+
+
+## Data Preparation
+
+- Extrac Data via Yelp API
+- Restaurant/Business Data
+- Reveiw Data
+
+key <- textreadr::read_rtf("API.rtf")  
+  
+Location: New York City, San Francisco, Dallas  
+  
+Categories : Restaurants  
+  
+Term: Japanese  
+  
+** Data reading please refer read_data.R file  
+
+```{r,echo =FALSE }
+new_york <- read.csv("./data/ny.csv",stringsAsFactors = FALSE)
+sf <- read.csv("./data/sf.csv",stringsAsFactors = FALSE)
+dallas <- read.csv("./data/dallas.csv",stringsAsFactors = FALSE)
+business_all <- bind_rows(mutate(new_york, city = "NYC"),
+          mutate(sf, city = "SF"),
+          mutate(dallas, city = "Dallas"))
+df_map <- business_all[-which(is.na(business_all$latitude)),]
+```
+
+
+## EDA
+-Summary of the Restaurant Data and Average Review Ratings by City.
+
+```{r,echo =FALSE }
+
+dataGroupByCityStar <- business_all %>% 
+    mutate(tsum = n()) %>% 
+    group_by(city, rating) 
+
+dataForTableByCityStar <- dataGroupByCityStar %>% group_by(city) %>%
+    summarise(total_business = n(), total_reviews = sum(review_count), avg_rating = round(mean(rating),2)) %>%
+                  arrange(desc(avg_rating))
+library(pander)
+panderOptions("digits", 3)
+pander(dataForTableByCityStar, caption = "Japanese Food Restaurant")
+
+```
+
+
+## EDA
+Ratings Score Distribution
+
+```{r,echo =FALSE }
+
+plot1 <-  ggplot(df_map,aes(x=rating)) + geom_bar(aes(color=city,fill=city),color = "white") +labs(y = "Counts",x="Rating",title="All Three Cities Ratings ")
+
+plotly_build(plot1)
+
+
+```
+
+
+## EDA
+Ratings Score Distribution By City  
+
+```{r,echo =FALSE }
+
+plot2 <- ggplot(df_map,aes(x=rating)) + geom_bar(aes(color=city,fill=city),color = "white") + facet_wrap(~factor(city))+labs(y = "Counts",x="Rating",title="Rating by City")
+
+plotly_build(plot2)
+
+```
+
+## EDA
+Ratings Score Distribution By Price Level  
+
+```{r,echo =FALSE }
+
+plot3 <- ggplot(df_map,aes(x=rating)) + geom_bar(aes(color=price,fill=city),color = "white") + facet_wrap(~factor(price))+labs(y = "Counts",x="Rating",title="Rating by Price")
+plotly_build(plot3)
+```
+
+## EDA
+We can see that most of the ratings are concenrated on 4 scores, Average Japanese restaurant ratings in New York is higher then the other two cities.
+
+
+## Mapping
+- smaller Blue--Rating <= 3.5
+- Orange--Rating = 4
+- Red--Rating >= 4.5
+```{r,echo =FALSE}
+getColor <- function(df_map) {
+    sapply(df_map$rating, function(rating) {
+        if(rating <=3.5) {
+            "blue"
+        } else if(rating <=4) {
+            "orange"
+        } else {
+            "red"
+        } })
+}
+
+
+icons <- awesomeIcons(
+    icon = 'cutlery',
+    iconColor = 'black',
+    library = 'fa',
+    markerColor = getColor(df_map),
+    spin=T
+)
+
+mapStates = map("state", fill = TRUE, plot = FALSE)
+
+leaflet() %>%    
+    addProviderTiles(providers$CartoDB.Positron)%>%
+    addPolygons(data = mapStates,fillColor = topo.colors(10, alpha = NULL), stroke = FALSE)%>% 
+    addAwesomeMarkers(data = df_map, ~longitude, ~latitude, icon=icons,
+                      label=~as.character(price),clusterOptions = T) 
+```
+
+
+## Text Mining
+Frequent words in New York Japanese Restaurant
+```{r,echo =FALSE}
+ny_high_review_r <- read.csv("./data/ny_high_review.csv",stringsAsFactors = FALSE)
+sf_high_review_r <- read.csv("./data/sf_high_review.csv",stringsAsFactors = FALSE)
+dl_high_review_r <- read.csv("./data/dl_high_review.csv",stringsAsFactors = FALSE)
+
+
+#### Prepare tidy test data 
+
+### NY
+tidy_ny <- ny_high_review_r %>% unnest_tokens(word, text)
+
+tidy_ny <- tidy_ny %>%
+    anti_join(stop_words)
+
+
+# tidy_ny %>%
+#     count(word, sort = TRUE) 
+
+### SF
+tidy_sf <- sf_high_review_r%>% unnest_tokens(word, text)
+
+tidy_sf <- tidy_sf %>%
+    anti_join(stop_words)
+
+
+# tidy_sf %>%
+#     count(word, sort = TRUE) 
+
+
+### Dallas
+tidy_dl <- dl_high_review_r %>% unnest_tokens(word, text)
+
+tidy_dl <- tidy_dl %>%
+    anti_join(stop_words)
+
+
+# tidy_dl %>%
+#     count(word, sort = TRUE) 
+
+## Plot
+tidy_ny %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 50) %>%
+    mutate(word = reorder(word, n)) %>%
+    ggplot(aes(word, n)) +
+    geom_col() +
+    ggtitle("New York")+
+    xlab(NULL) +
+    coord_flip()
+
+
+
+```
+
+## Text Mining
+Frequent words in San Fransisco Japanese Restaurant
+```{r,echo =FALSE}
+tidy_sf %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 20) %>%
+    mutate(word = reorder(word, n)) %>%
+    ggplot(aes(word, n)) +
+    geom_col() +
+    ggtitle("San Fransisco")+
+    xlab(NULL) +
+    coord_flip()
+
+```
+
+## Text Mining
+Frequent words in Dallas Japanese Restaurant
+```{r,echo =FALSE}
+tidy_dl %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 20) %>%
+    mutate(word = reorder(word, n)) %>%
+    ggplot(aes(word, n)) +
+    geom_col() +
+    ggtitle("Dallas")+
+    xlab(NULL) +
+    coord_flip()
+```
+
+
+
+## Text Mining
+```{r,echo =FALSE}
+library(tidyr)
+
+frequency <- bind_rows(mutate(tidy_ny, city = "NYC"),
+                       mutate(tidy_sf, city = "SF"),
+                       mutate(tidy_dl, city = "Dallas")) %>% 
+    mutate(word = str_extract(word, "[a-z']+")) %>%
+    count(city, word) %>%
+    group_by(city) %>%
+    mutate(proportion = n / sum(n)) %>% 
+    select(-n) %>% 
+    spread(city, proportion) %>% 
+    gather(city, proportion, `NYC`:`SF`)
+
+
+library(scales)
+
+# expect a warning about rows with missing values being removed
+ggplot(frequency, aes(x = proportion, y = `Dallas`, color = abs(`Dallas` - proportion))) +
+    geom_abline(color = "gray40", lty = 2) +
+    geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+    geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+    scale_x_log10(labels = percent_format()) +
+    scale_y_log10(labels = percent_format()) +
+    scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+    facet_wrap(~city, ncol = 2) +
+    theme(legend.position="none") +
+    labs(y = "Dallas", x = NULL)
+
+### Let’s quantify how similar and different these sets of word frequencies are using a correlation test. 
+### How correlated are the review words frequencies between NYC and SF in high restaurant?
+```
+
+
+## Text Mining
+- a
+From Below two slides we can see that NYC and Dallas have more correlation in restaurant reciews in high ratings restaurant than with San Fransisco
+```{r,echo =FALSE}
+### How correlated are the review words frequencies between NYC and SF in high restaurant?
+
+cor.test(data = frequency[frequency$city == "SF",],
+         ~ proportion + `Dallas`)
+
+```
+
+## Text Mining
+- b
+```{r,echo =FALSE}
+### How correlated are the review words frequencies between NYC and SF in high restaurant?
+
+cor.test(data = frequency[frequency$city == "NYC",],
+         ~ proportion + `Dallas`)
+```
